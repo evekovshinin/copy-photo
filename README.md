@@ -11,7 +11,8 @@ A robust Python script for securely copying photos from a camera's memory card t
 
 ## Usage
 bash
-'''python3 photo_copy.py "project_name" [--label EOS_DIGITAL] [--user $(whoami)] [--no-verify]'''
+```python3 photo_copy.py "project_name" [--label EOS_DIGITAL] [--user $(whoami)] [--no-verify]```
+
 ## Configuration
 Edit ~/.config/photo_copy/config.json to customize:
 
