@@ -26,3 +26,5 @@ Edit ~/.config/photo_copy/config.json to customize:
 * tqdm package (```pip install tqdm```)
 
 Perfect for photographers who need reliable, verified transfers of their camera photos with automatic organization.
+
+New line
