@@ -4,6 +4,7 @@ import sys
 import json
 import shutil
 import argparse
+import glob
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
@@ -14,10 +15,12 @@ DEFAULT_CONFIG = {
         "/media/{user}/{label}",
         "/run/media/{user}/{label}"
     ],
+    "source_patterns": ["DCIM/*"],  # Новое поле: маски для поиска директорий с фото
     "photo_extensions": [".jpg", ".jpeg", ".cr2", ".raw"],
     "destination_template": "{date}-canon600d-{name}",
     "subfolders": ["selected", "selected/exported"]
 }
+
 
 def load_config(config_path):
     """Загрузка конфигурации из JSON файла."""
@@ -37,6 +40,7 @@ def load_config(config_path):
 
     return config
 
+
 def find_mount_point(config, label, user):
     """Поиск точки монтирования по метке диска."""
     for pattern in config["mount_patterns"]:
@@ -47,19 +51,42 @@ def find_mount_point(config, label, user):
         f"Диск с меткой {label} не найден. Проверенные пути: {config['mount_patterns']}"
     )
 
-def get_earliest_photo_date(source_dir, extensions):
-    """Получение даты самого раннего фото в директории."""
+
+def find_photo_directories(mount_point, source_patterns):
+    """Поиск директорий с фотографиями по заданным маскам."""
+    photo_dirs = []
+
+    for pattern in source_patterns:
+        full_pattern = os.path.join(mount_point, pattern)
+        matched_dirs = glob.glob(full_pattern)
+
+        for dir_path in matched_dirs:
+            if os.path.isdir(dir_path):
+                photo_dirs.append(dir_path)
+                print(f"Найдена директория с фото: {dir_path}")
+
+    if not photo_dirs:
+        raise FileNotFoundError(
+            f"Не найдено ни одной директории с фото по маскам: {source_patterns}"
+        )
+
+    return photo_dirs
+
+
+def get_earliest_photo_date(photo_dirs, extensions):
+    """Получение даты самого раннего фото в директориях."""
     earliest_date = None
     extensions = tuple(ext.lower() for ext in extensions)
 
-    for root, _, files in os.walk(source_dir):
-        for file in files:
-            if file.lower().endswith(extensions):
-                file_path = os.path.join(root, file)
-                file_date = datetime.fromtimestamp(os.path.getmtime(file_path))
+    for photo_dir in photo_dirs:
+        for root, _, files in os.walk(photo_dir):
+            for file in files:
+                if file.lower().endswith(extensions):
+                    file_path = os.path.join(root, file)
+                    file_date = datetime.fromtimestamp(os.path.getmtime(file_path))
 
-                if earliest_date is None or file_date < earliest_date:
-                    earliest_date = file_date
+                    if earliest_date is None or file_date < earliest_date:
+                        earliest_date = file_date
 
     if earliest_date is None:
         raise FileNotFoundError(
@@ -68,30 +95,32 @@ def get_earliest_photo_date(source_dir, extensions):
 
     return earliest_date.strftime("%Y%m%d")
 
-def get_files_info(directory, extensions):
+
+def get_files_info(directories, extensions):
     """Получение информации о файлах: количество и общий размер."""
     file_count = 0
     total_size = 0
     extensions = tuple(ext.lower() for ext in extensions)
 
-
-    for root, _, files in os.walk(directory):
-        for file in files:
-            if file.lower().endswith(extensions):
-                file_path = os.path.join(root, file)
-                file_count += 1
-                total_size += os.path.getsize(file_path)
+    for directory in directories:
+        for root, _, files in os.walk(directory):
+            for file in files:
+                if file.lower().endswith(extensions):
+                    file_path = os.path.join(root, file)
+                    file_count += 1
+                    total_size += os.path.getsize(file_path)
 
     return file_count, total_size
 
-def verify_copy(source_dir, dest_dir, extensions):
+
+def verify_copy(source_dirs, dest_dir, extensions):
     """Проверка корректности копирования."""
-    src_count, src_size = get_files_info(source_dir, extensions)
-    dst_count, dst_size = get_files_info(dest_dir, extensions)
+    src_count, src_size = get_files_info(source_dirs, extensions)
+    dst_count, dst_size = get_files_info([dest_dir], extensions)
 
     print("\nПроверка результатов копирования:")
     print(f"Файлов в источнике: {src_count}, в приемнике: {dst_count}")
-    print(f"Размер источника: {src_size / (1024*1024):.2f} MB, приемника: {dst_size / (1024*1024):.2f} MB")
+    print(f"Размер источника: {src_size / (1024 * 1024):.2f} MB, приемника: {dst_size / (1024 * 1024):.2f} MB")
 
     if src_count != dst_count:
         print(f"⚠️ Предупреждение: количество файлов не совпадает ({src_count} vs {dst_count})")
@@ -104,16 +133,18 @@ def verify_copy(source_dir, dest_dir, extensions):
     print("✓ Все файлы успешно скопированы, проверка пройдена")
     return True
 
-def copy_with_progress(source_dir, dest_dir, extensions):
+
+def copy_with_progress(source_dirs, dest_dir, extensions):
     """Копирование файлов с прогресс-баром."""
     # Создаем список всех файлов для копирования
     all_files = []
     extensions = tuple(ext.lower() for ext in extensions)
 
-    for root, _, files in os.walk(source_dir):
-        for file in files:
-            if file.lower().endswith(extensions):
-                all_files.append(os.path.join(root, file))
+    for source_dir in source_dirs:
+        for root, _, files in os.walk(source_dir):
+            for file in files:
+                if file.lower().endswith(extensions):
+                    all_files.append(os.path.join(root, file))
 
     if not all_files:
         print("Нет файлов для копирования!")
@@ -128,11 +159,13 @@ def copy_with_progress(source_dir, dest_dir, extensions):
 
     return True
 
+
 def setup_destination(dest_path, subfolders):
     """Создание целевой директории и поддиректорий."""
     os.makedirs(dest_path, exist_ok=True)
     for folder in subfolders:
         os.makedirs(os.path.join(dest_path, folder), exist_ok=True)
+
 
 def main():
     # Определяем путь к конфигу
@@ -148,45 +181,47 @@ def main():
     parser = argparse.ArgumentParser(description="Копирование фотографий с флешки фотоаппарата")
     parser.add_argument("name", help="Название папки для сохранения")
     parser.add_argument("--label", default="EOS_DIGITAL",
-                       help="Метка диска (по умолчанию: EOS_DIGITAL)")
+                        help="Метка диска (по умолчанию: EOS_DIGITAL)")
     parser.add_argument("--user", default=os.getenv("USER"),
-                       help="Имя пользователя (по умолчанию: текущий пользователь)")
-    parser.add_argument("--source-subdir", default="DCIM/100CANON",
-                       help="Поддиректория на флешке с фото (по умолчанию: DCIM/100CANON)")
+                        help="Имя пользователя (по умолчанию: текущий пользователь)")
     parser.add_argument("--no-verify", action="store_true",
-                       help="Пропустить проверку после копирования")
+                        help="Пропустить проверку после копирования")
 
     args = parser.parse_args()
 
     try:
         # 1. Находим точку монтирования
         mount_point = find_mount_point(config, args.label, args.user)
-        source_dir = os.path.join(mount_point, args.source_subdir)
-        print(f"Найдена флешка в: {source_dir}")
+        print(f"Найдена флешка в: {mount_point}")
 
-        # 2. Получаем дату самого раннего фото
-        date_str = get_earliest_photo_date(source_dir, config["photo_extensions"])
+        # 2. Ищем директории с фотографиями
+        photo_dirs = find_photo_directories(mount_point, config["source_patterns"])
+        print(f"Найдено директорий с фото: {len(photo_dirs)}")
+
+        # 3. Получаем дату самого раннего фото
+        date_str = get_earliest_photo_date(photo_dirs, config["photo_extensions"])
         print(f"Дата самого раннего фото: {date_str}")
 
-        # 3. Создаем целевую директорию
+        # 4. Создаем целевую директорию
         dest_folder = config["destination_template"].format(date=date_str, name=args.name)
         dest_dir = os.path.expanduser(f"~/Photos/{dest_folder}")
         print(f"Фотографии будут скопированы в: {dest_dir}")
 
-        # 4. Создаем структуру папок
+        # 5. Создаем структуру папок
         setup_destination(dest_dir, config["subfolders"])
 
-        # 5. Копируем файлы
-        copy_success = copy_with_progress(source_dir, dest_dir, config["photo_extensions"])
+        # 6. Копируем файлы
+        copy_success = copy_with_progress(photo_dirs, dest_dir, config["photo_extensions"])
 
-        # 6. Проверяем результаты копирования
+        # 7. Проверяем результаты копирования
         if copy_success and not args.no_verify:
-            verify_copy(source_dir, dest_dir, config["photo_extensions"])
+            verify_copy(photo_dirs, dest_dir, config["photo_extensions"])
 
         print("\nГотово!")
     except Exception as e:
         print(f"Ошибка: {str(e)}", file=sys.stderr)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
