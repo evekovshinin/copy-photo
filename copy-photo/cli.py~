@@ -1,0 +1,74 @@
+import os
+import sys
+import argparse
+from .config import load_config
+from .utils import find_mount_point
+from .file_operations import (
+    find_photo_directories,
+    get_earliest_photo_date,
+    copy_with_progress,
+    setup_destination
+)
+from .utils import verify_copy
+
+def main():
+    # Определяем путь к конфигу
+    config_dir = os.path.expanduser("~/.config/photo_copy")
+    config_path = os.path.join(config_dir, "config.json")
+
+    # Создаем директорию для конфига если ее нет
+    os.makedirs(config_dir, exist_ok=True)
+
+    # Загружаем конфиг
+    config = load_config(config_path)
+
+    parser = argparse.ArgumentParser(description="Копирование фотографий с флешки фотоаппарата")
+    parser.add_argument("name", help="Название папки для сохранения")
+    parser.add_argument("--label", default="EOS_DIGITAL",
+                        help="Метка диска (по умолчанию: EOS_DIGITAL)")
+    parser.add_argument("--user", default=os.getenv("USER"),
+                        help="Имя пользователя (по умолчанию: текущий пользователь)")
+    parser.add_argument("--no-verify", action="store_true",
+                        help="Пропустить проверку после копирования")
+
+    args = parser.parse_args()
+
+    try:
+        # 1. Находим точку монтирования
+        mount_point = find_mount_point(config, args.label, args.user)
+        print(f"Найдена флешки в: {mount_point}")
+
+        # 2. Ищем директории с фотографиями
+        photo_dirs = find_photo_directories(
+            mount_point,
+            config["source_patterns"],
+            config["photo_extensions"]
+        )
+        print(f"Найдено директорий с фото: {len(photo_dirs)}")
+
+        # 3. Получаем дату самого раннего фото
+        date_str = get_earliest_photo_date(photo_dirs, config["photo_extensions"])
+        print(f"Дата самого раннего фото: {date_str}")
+
+        # 4. Создаем целевую директорию
+        dest_folder = config["destination_template"].format(date=date_str, name=args.name)
+        dest_dir = os.path.expanduser(f"~/Photos/{dest_folder}")
+        print(f"Фотографии будут скопированы в: {dest_dir}")
+
+        # 5. Создаем структуру папок
+        setup_destination(dest_dir, config["subfolders"])
+
+        # 6. Копируем файлы
+        copy_success = copy_with_progress(photo_dirs, dest_dir, config["photo_extensions"])
+
+        # 7. Проверяем результаты копирования
+        if copy_success and not args.no_verify:
+            verify_copy(photo_dirs, dest_dir, config["photo_extensions"])
+
+        print("\nГотово!")
+    except Exception as e:
+        print(f"Ошибка: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
