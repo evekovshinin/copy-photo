@@ -16,8 +16,8 @@ DEFAULT_CONFIG = {
         "/run/media/{user}/{label}"
     ],
     "source_patterns": ["DCIM/*"],  # Новое поле: маски для поиска директорий с фото
-    "photo_extensions": [".jpg", ".jpeg", ".cr2", ".raw"],
-    "destination_template": "{date}-canon600d-{name}",
+    "photo_extensions": [".jpg", ".jpeg", ".cr2", ".cr3", ".raw"],
+    "destination_template": "{date}-canon90d-{name}",
     "subfolders": ["selected", "selected/exported"]
 }
 
@@ -52,22 +52,38 @@ def find_mount_point(config, label, user):
     )
 
 
-def find_photo_directories(mount_point, source_patterns):
+def find_photo_directories(mount_point, config_source_patterns, config_photo_extensions):
     """Поиск директорий с фотографиями по заданным маскам."""
     photo_dirs = []
 
-    for pattern in source_patterns:
+    extensions = tuple(ext.lower() for ext in config_photo_extensions)
+
+    for pattern in config_source_patterns:
         full_pattern = os.path.join(mount_point, pattern)
         matched_dirs = glob.glob(full_pattern)
 
         for dir_path in matched_dirs:
             if os.path.isdir(dir_path):
-                photo_dirs.append(dir_path)
-                print(f"Найдена директория с фото: {dir_path}")
+                # Проверяем, содержит ли директория файлы с нужными расширениями
+                contains_photos = False
+
+                # Проверяем файлы в текущей директории и всех поддиректориях
+                for root, _, files in os.walk(dir_path):
+                    for file in files:
+                        if file.lower().endswith(extensions):
+                            contains_photos = True
+                            break
+                    if contains_photos:
+                        break
+
+                if contains_photos:
+                    photo_dirs.append(dir_path)
+                    print(f"Найдена директория с фото: {dir_path}")
 
     if not photo_dirs:
         raise FileNotFoundError(
-            f"Не найдено ни одной директории с фото по маскам: {source_patterns}"
+            f"Не найдено ни одной директории с фото по маскам: {source_patterns} "
+            f"содержащей файлы с расширениями: {', '.join(extensions)}"
         )
 
     return photo_dirs
@@ -195,7 +211,7 @@ def main():
         print(f"Найдена флешка в: {mount_point}")
 
         # 2. Ищем директории с фотографиями
-        photo_dirs = find_photo_directories(mount_point, config["source_patterns"])
+        photo_dirs = find_photo_directories(mount_point, config["source_patterns"], config["photo_extensions"])
         print(f"Найдено директорий с фото: {len(photo_dirs)}")
 
         # 3. Получаем дату самого раннего фото
