@@ -9,7 +9,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'copy-photo=copy-photo.cli:main',
+            'copy-photo=copy_photo.cli:main',
         ],
     },
     author="Evgeny Vekovshinin",
