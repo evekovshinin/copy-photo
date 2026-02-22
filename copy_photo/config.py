@@ -7,9 +7,9 @@ DEFAULT_CONFIG = {
         "/run/media/{user}/{label}"
     ],
     "source_patterns": ["DCIM/*"],
-    "photo_extensions": [".jpg", ".jpeg", ".cr2", ".cr3", ".raw",".nef","arw","raf","rw2",".orf",".x3f",".dng"],
-    "destination_template": "{date}-canon90d-{name}",
-    "subfolders": ["selected", "selected/exported"]
+    "photo_extensions": [".jpg", ".jpeg", ".cr2", ".cr3", ".raw", ".nef", "arw", "raf", "rw2", ".orf", ".x3f", ".dng"],
+    "destination_template": "{date}-{camera}-{name}",
+    "subfolders": ["selected", "selected/exported","raw-camera","jpg-camera","raw-selected","jpg-selected","jpg-exported","jpg-exported-print","jpg-exported-telegram","jpg-exported-vk"]
 }
 
 def load_config(config_path):
