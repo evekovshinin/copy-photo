@@ -9,8 +9,9 @@ logger = logging.getLogger(__name__)
 class OrganizerService:
     """Сервис для организации фотографий по папкам"""
 
-    def __init__(self, base_output_dir: Path):
+    def __init__(self, base_output_dir: Path, config: Dict = None):
         self.base_output_dir = Path(base_output_dir)
+        self.config = config or {}
 
     def generate_folder_structure(self, photos: PhotoCollection, session_name: str) -> Dict[tuple, Path]:
         """Генерация структуры папок на основе фотографий"""
@@ -25,17 +26,16 @@ class OrganizerService:
             folder_path = self.base_output_dir / folder_name
 
             # Создаем подпапки
-            # TODO move subfolder list into config
-            subfolders = [
-                "raw-camera",
-                "jpg-camera",
-                "raw-selected",
-                "jpg-export",
-                "jpg-export-print",
-                "jpg-export-telegram",
-                "jpg-export-instagram",
-                "jpg-export-vk"
-                ]
+            subfolders = self.config.get("subfolders", [])
+            subfolders += self.config.get("subfolders-raw", [])
+            subfolders += self.config.get("subfolders-jpg", [])
+
+            if not subfolders:
+                subfolders = ["raw-camera", "jpg-camera"]
+
+            # Убираем дубликаты с сохранением порядка
+            subfolders = list(dict.fromkeys(subfolders))
+
             for subfolder in subfolders:
                 (folder_path / subfolder).mkdir(parents=True, exist_ok=True)
 

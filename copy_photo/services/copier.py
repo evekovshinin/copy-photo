@@ -30,10 +30,31 @@ class CopyResult:
 class CopierService:
     """Сервис для копирования фотографий"""
 
-    JPG_EXTENSIONS = {'.jpg', '.jpeg'}
-
-    def __init__(self, preserve_metadata: bool = True):
+    def __init__(self, config: Dict = None, preserve_metadata: bool = True):
+        self.config = config or {}
         self.preserve_metadata = preserve_metadata
+
+        self.jpg_extensions = set(self._normalize_extensions(
+            self.config.get("photo_extensions-jpg", [".jpg", ".jpeg"])
+        ))
+        self.raw_extensions = set(self._normalize_extensions(
+            self.config.get("photo_extensions-raw", [".raw"])
+        ))
+
+        raw_subfolders = self.config.get("subfolders-raw", ["raw-camera"])
+        jpg_subfolders = self.config.get("subfolders-jpg", ["jpg-camera"])
+        self.raw_target_subfolder = raw_subfolders[0] if raw_subfolders else "raw-camera"
+        self.jpg_target_subfolder = jpg_subfolders[0] if jpg_subfolders else "jpg-camera"
+
+    @staticmethod
+    def _normalize_extensions(extensions: List[str]) -> List[str]:
+        normalized = []
+        for ext in extensions:
+            value = ext.lower().strip()
+            if not value:
+                continue
+            normalized.append(value if value.startswith(".") else f".{value}")
+        return normalized
 
     def copy_photos(self, photos: PhotoCollection, target_dir: Path) -> CopyResult:
         """Копирование фотографий в целевую директорию"""
@@ -43,7 +64,13 @@ class CopierService:
         for photo in tqdm(photos, desc="Копирование"):
             try:
                 # Выбираем подпапку на основе типа файла
-                subfolder = "jpg-camera" if photo.extension in self.JPG_EXTENSIONS else "raw-camera"
+                if photo.extension in self.jpg_extensions:
+                    subfolder = self.jpg_target_subfolder
+                elif photo.extension in self.raw_extensions:
+                    subfolder = self.raw_target_subfolder
+                else:
+                    subfolder = self.raw_target_subfolder
+
                 target_path = target_dir / subfolder / photo.filename
 
                 if self.preserve_metadata:

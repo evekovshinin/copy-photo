@@ -31,17 +31,30 @@ class PhotoCopyApp:
         self.scanner = ScannerService(ExifReader())
         self.photos = PhotoCollection()
 
+    @staticmethod
+    def _normalize_extensions(extensions: List[str]) -> List[str]:
+        normalized = []
+        for ext in extensions:
+            value = ext.lower().strip()
+            if not value:
+                continue
+            normalized.append(value if value.startswith(".") else f".{value}")
+        return normalized
+
     def run(self, session_name: str, source_dirs: List[Path], output_base: Path):
         """Основной процесс копирования"""
         logger.info(f"Начало обработки сессии: {session_name}")
 
         # 1. Сканирование
         logger.info("Этап 1: Сканирование фотографий")
+        raw_extensions = self._normalize_extensions(self.config.get("photo_extensions-raw", []))
+        jpg_extensions = self._normalize_extensions(self.config.get("photo_extensions-jpg", [".jpg", ".jpeg"]))
+        scan_extensions = list(dict.fromkeys(raw_extensions + jpg_extensions))
+
         for source_dir in source_dirs:
             photos = self.scanner.scan_directory(
                 source_dir,
-                # TODO Think about use default values here
-                self.config.get("photo_extensions", [".jpg", ".jpeg", ".raw"])
+                scan_extensions
             )
             self.photos.add_many(photos)
 
@@ -52,12 +65,12 @@ class PhotoCopyApp:
 
         # 2. Организация
         logger.info("Этап 2: Организация структуры папок")
-        organizer = OrganizerService(output_base)
+        organizer = OrganizerService(output_base, self.config)
         folder_structure = organizer.generate_folder_structure(self.photos, session_name)
 
         # 3. Копирование
         logger.info("Этап 3: Копирование файлов")
-        copier = CopierService(preserve_metadata=True)
+        copier = CopierService(config=self.config, preserve_metadata=True)
 
         overall_result = CopyResult()
 
