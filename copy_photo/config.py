@@ -10,6 +10,7 @@ DEFAULT_CONFIG = {
     "source_patterns": ["DCIM/*"],
     "photo_extensions-raw": [".cr2", ".cr3", ".raw", ".nef", "arw", "raf", "rw2", ".orf", ".x3f", ".dng"],
     "photo_extensions-jpg": [".jpg", ".jpeg"],
+    "destination_path": "~/Photos",
     "destination_template": "{date}-{camera}-{name}",
     "subfolders": ["camera-raw","camera-jpg","selected-raw","selected-jpg","exported-jpg","exported-jpg-print","exported-jpg-telegram","exported-jpg-vk"],
     "subfolders-raw": ["camera-raw"],

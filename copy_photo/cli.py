@@ -140,8 +140,8 @@ Examples:
     parser.add_argument(
         "--output", "-o",
         type=Path,
-        default=Path.cwd(),
-        help="Output base directory (default: current directory)"
+        default=None,
+        help="Output base directory (default: destination_path from config)"
     )
 
     parser.add_argument(
@@ -152,12 +152,17 @@ Examples:
 
     args = parser.parse_args()
 
-    # Create output directory if it doesn't exist
-    args.output.mkdir(parents=True, exist_ok=True)
-
     # Create and run the app
     try:
         app = PhotoCopyApp(config_path=args.config)
+
+        output_base = args.output
+        if output_base is None:
+            output_base = Path(app.config.get("destination_path", "~/Photos")).expanduser()
+        else:
+            output_base = output_base.expanduser()
+
+        output_base.mkdir(parents=True, exist_ok=True)
 
         # Convert source dirs to Path objects or auto-discover from config
         if args.source_dirs:
@@ -175,7 +180,7 @@ Examples:
                 print(f"Error: Source directory does not exist: {src_dir}")
                 sys.exit(1)
 
-        success = app.run(args.session_name, source_dirs, args.output)
+        success = app.run(args.session_name, source_dirs, output_base)
 
         if success:
             print("\nКопирование завершено успешно!")

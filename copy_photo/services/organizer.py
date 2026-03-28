@@ -31,7 +31,7 @@ class OrganizerService:
             subfolders += self.config.get("subfolders-jpg", [])
 
             if not subfolders:
-                subfolders = ["raw-camera", "jpg-camera"]
+                subfolders = ["camera-raw", "camera-jpg"]
 
             # Убираем дубликаты с сохранением порядка
             subfolders = list(dict.fromkeys(subfolders))

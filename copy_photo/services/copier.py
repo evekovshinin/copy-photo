@@ -43,8 +43,8 @@ class CopierService:
 
         raw_subfolders = self.config.get("subfolders-raw", ["raw-camera"])
         jpg_subfolders = self.config.get("subfolders-jpg", ["jpg-camera"])
-        self.raw_target_subfolder = raw_subfolders[0] if raw_subfolders else "raw-camera"
-        self.jpg_target_subfolder = jpg_subfolders[0] if jpg_subfolders else "jpg-camera"
+        self.raw_target_subfolder = raw_subfolders[0] if raw_subfolders else "camera-raw"
+        self.jpg_target_subfolder = jpg_subfolders[0] if jpg_subfolders else "camera-jpg"
 
     @staticmethod
     def _normalize_extensions(extensions: List[str]) -> List[str]:
