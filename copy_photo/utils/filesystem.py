@@ -1,4 +1,6 @@
 import os
+import glob
+from pathlib import Path
 
 def find_mount_point(config, label, user):
     """Поиск точки монтирования по метке диска."""
@@ -9,6 +11,38 @@ def find_mount_point(config, label, user):
     raise FileNotFoundError(
         f"Диск с меткой {label} не найден. Проверенные пути: {config['mount_patterns']}"
     )
+
+
+def find_source_dirs(config):
+    """Поиск исходных директорий по шаблонам из конфига."""
+    user = os.getenv("USER", "")
+    label = config.get("label", "*")
+
+    mount_patterns = config.get("mount_patterns", [])
+    source_patterns = config.get("source_patterns", ["DCIM/*"])
+
+    source_dirs = []
+
+    for mount_pattern in mount_patterns:
+        formatted_mount = mount_pattern.format(user=user, label=label)
+
+        for mount_path in glob.glob(formatted_mount):
+            for source_pattern in source_patterns:
+                full_pattern = str(Path(mount_path) / source_pattern)
+                for source_path in glob.glob(full_pattern):
+                    if os.path.isdir(source_path):
+                        source_dirs.append(Path(source_path))
+
+    # Убираем дубликаты, сохраняя порядок
+    source_dirs = list(dict.fromkeys(source_dirs))
+
+    if not source_dirs:
+        raise FileNotFoundError(
+            "Не удалось найти директории с фото по шаблонам "
+            f"mount_patterns={mount_patterns}, source_patterns={source_patterns}."
+        )
+
+    return source_dirs
 
 def get_files_info(directories, extensions):
     """Получение информации о файлах: количество и общий размер."""
@@ -28,8 +62,6 @@ def get_files_info(directories, extensions):
 
 def verify_copy(source_dirs, dest_dir, extensions):
     """Проверка корректности копирования."""
-    from .utils import get_files_info
-
     src_count, src_size = get_files_info(source_dirs, extensions)
     dst_count, dst_size = get_files_info([dest_dir], extensions)
 

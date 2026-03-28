@@ -13,7 +13,7 @@ from copy_photo.services.organizer import OrganizerService
 from copy_photo.services.copier import CopierService, CopyResult
 from copy_photo.utils.exif import ExifReader
 from copy_photo.config import load_config
-from copy_photo.utils import find_mount_point
+from copy_photo.utils import find_source_dirs
 
 # Настройка логирования
 logging.basicConfig(
@@ -120,8 +120,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  copy-photo session1 /path/to/source1 /path/to/source2
-  copy-photo --config /path/to/config.json session1 /media/camera/DCIM
+    copy-photo session1
+    copy-photo session1 /path/to/source1 /path/to/source2
+    copy-photo --config /path/to/config.json session1
         """
     )
 
@@ -132,8 +133,8 @@ Examples:
 
     parser.add_argument(
         "source_dirs",
-        nargs="+",
-        help="Source directories to scan for photos"
+        nargs="*",
+        help="Source directories to scan for photos (optional; auto-detected from config if omitted)"
     )
 
     parser.add_argument(
@@ -151,21 +152,29 @@ Examples:
 
     args = parser.parse_args()
 
-    # Convert source dirs to Path objects
-    source_dirs = [Path(src) for src in args.source_dirs]
-
-    # Check if source directories exist
-    for src_dir in source_dirs:
-        if not src_dir.exists():
-            print(f"Error: Source directory does not exist: {src_dir}")
-            sys.exit(1)
-
     # Create output directory if it doesn't exist
     args.output.mkdir(parents=True, exist_ok=True)
 
     # Create and run the app
     try:
         app = PhotoCopyApp(config_path=args.config)
+
+        # Convert source dirs to Path objects or auto-discover from config
+        if args.source_dirs:
+            source_dirs = [Path(src) for src in args.source_dirs]
+        else:
+            source_dirs = find_source_dirs(app.config)
+            logger.info(
+                "Автоматически найдены исходные директории: %s",
+                ", ".join(str(path) for path in source_dirs)
+            )
+
+        # Check if source directories exist
+        for src_dir in source_dirs:
+            if not src_dir.exists():
+                print(f"Error: Source directory does not exist: {src_dir}")
+                sys.exit(1)
+
         success = app.run(args.session_name, source_dirs, args.output)
 
         if success:
