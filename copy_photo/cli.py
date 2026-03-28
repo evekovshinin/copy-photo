@@ -27,7 +27,7 @@ class PhotoCopyApp:
     """Основной класс приложения"""
 
     def __init__(self, config_path: str = None):
-        self.config = load_config(config_path) if config_path else {}
+        self.config = load_config(config_path) if config_path else load_config(None)
         self.scanner = ScannerService(ExifReader())
         self.photos = PhotoCollection()
 

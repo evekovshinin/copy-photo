@@ -3,15 +3,27 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from PIL import Image, ExifTags
 from PIL.ExifTags import TAGS
+import exiftool
 from ..models.photo import CameraInfo, PhotoMetadata
 
 
 class ExifReader:
     """Читатель EXIF данных"""
 
+    RAW_EXTENSIONS = {'.cr2', '.cr3', '.raw', '.nef', '.arw', '.raf', '.rw2', '.orf', '.x3f', '.dng'}
+
     @staticmethod
     def read_exif(image_path: Path) -> Optional[Dict[str, Any]]:
         """Чтение EXIF данных из файла"""
+        ext = image_path.suffix.lower()
+        if ext in ExifReader.RAW_EXTENSIONS:
+            return ExifReader._read_exif_exiftool(image_path)
+        else:
+            return ExifReader._read_exif_pil(image_path)
+
+    @staticmethod
+    def _read_exif_pil(image_path: Path) -> Optional[Dict[str, Any]]:
+        """Чтение EXIF с помощью PIL"""
         try:
             with Image.open(image_path) as img:
                 exif = img._getexif()
@@ -23,6 +35,24 @@ class ExifReader:
         except Exception:
             return None
         return None
+
+    @staticmethod
+    def _read_exif_exiftool(image_path: Path) -> Optional[Dict[str, Any]]:
+        """Чтение EXIF с помощью exiftool"""
+        try:
+            with exiftool.ExifToolHelper() as et:
+                metadata = et.get_metadata(str(image_path))[0]
+                # Преобразуем ключи exiftool в стандартные
+                exif_dict = {}
+                for key, value in metadata.items():
+                    if key.startswith('EXIF:'):
+                        clean_key = key[5:]
+                        exif_dict[clean_key] = value
+                    elif key in ['Make', 'Model', 'DateTimeOriginal', 'DateTimeDigitized', 'DateTime']:
+                        exif_dict[key] = value
+                return exif_dict if exif_dict else None
+        except Exception:
+            return None
 
     @staticmethod
     def parse_exif(exif_data: Dict) -> PhotoMetadata:

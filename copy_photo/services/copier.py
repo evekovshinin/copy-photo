@@ -30,6 +30,8 @@ class CopyResult:
 class CopierService:
     """Сервис для копирования фотографий"""
 
+    JPG_EXTENSIONS = {'.jpg', '.jpeg'}
+
     def __init__(self, preserve_metadata: bool = True):
         self.preserve_metadata = preserve_metadata
 
@@ -40,7 +42,9 @@ class CopierService:
         # TODO requires sort raws and jpgs between directories
         for photo in tqdm(photos, desc="Копирование"):
             try:
-                target_path = target_dir / "raw-camera" / photo.filename
+                # Выбираем подпапку на основе типа файла
+                subfolder = "jpg-camera" if photo.extension in self.JPG_EXTENSIONS else "raw-camera"
+                target_path = target_dir / subfolder / photo.filename
 
                 if self.preserve_metadata:
                     # Копируем с сохранением всех метаданных
