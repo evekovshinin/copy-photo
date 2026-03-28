@@ -22,8 +22,10 @@ fi
 
 # Check Python version (require 3.6+)
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-if [[ $(echo "$PYTHON_VERSION < 3.6" | bc -l) -eq 1 ]]; then
-    echo "Error: Python 3.6 or higher is required. Current version: $PYTHON_VERSION"
+REQUIRED_VERSION="3.6"
+
+if [[ "$(printf '%s\n%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]]; then
+    echo "Error: Python $REQUIRED_VERSION or higher is required. Current version: $PYTHON_VERSION"
     exit 1
 fi
 
