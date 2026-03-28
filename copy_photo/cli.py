@@ -99,53 +99,73 @@ class PhotoCopyApp:
             for error in result.errors[:5]:
                 print(f"  • {error}")
 
-        print(f"\nСозданные папки:")
-        for (date, camera), path in folder_structure.items():
-            print(f"  📁 {date}-{camera}")
-            print(f"     {path}")
 
 def main():
-    # Конфигурация
-    config_dir = Path.home() / ".config" / "photo_copy"
-    config_path = config_dir / "config.json"
-    config_dir.mkdir(exist_ok=True)
+    """Main entry point for the command line interface"""
+    parser = argparse.ArgumentParser(
+        description="Professional photo copying and organization tool with EXIF support",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  copy-photo session1 /path/to/source1 /path/to/source2
+  copy-photo --config /path/to/config.json session1 /media/camera/DCIM
+        """
+    )
 
-    # Аргументы командной строки
-    parser = argparse.ArgumentParser(description="Копирование фотографий с организацией по метаданным")
-    parser.add_argument("session", help="Название фотосессии")
-    parser.add_argument("--source", "-s", action="append",
-                       help="Исходные директории (можно указать несколько)")
-    parser.add_argument("--output", "-o", default="~/Photos",
-                       help="Базовая выходная директория")
-    parser.add_argument("--camera", "-c", help="Фильтр по камере")
-    parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument(
+        "session_name",
+        help="Name of the copying session (used in folder naming)"
+    )
+
+    parser.add_argument(
+        "source_dirs",
+        nargs="+",
+        help="Source directories to scan for photos"
+    )
+
+    parser.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=Path.cwd(),
+        help="Output base directory (default: current directory)"
+    )
+
+    parser.add_argument(
+        "--config", "-c",
+        type=str,
+        help="Path to configuration file"
+    )
 
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    # Convert source dirs to Path objects
+    source_dirs = [Path(src) for src in args.source_dirs]
 
+    # Check if source directories exist
+    for src_dir in source_dirs:
+        if not src_dir.exists():
+            print(f"Error: Source directory does not exist: {src_dir}")
+            sys.exit(1)
+
+    # Create output directory if it doesn't exist
+    args.output.mkdir(parents=True, exist_ok=True)
+
+    # Create and run the app
     try:
-        # Создаем экземпляр приложения
-        app = PhotoCopyApp(config_path)
+        app = PhotoCopyApp(config_path=args.config)
+        success = app.run(args.session_name, source_dirs, args.output)
 
-        # Если source не указан, ищем точку монтирования
-        if not args.source:
-            config = load_config(config_path)
-            mount_point = find_mount_point(config, "EOS_DIGITAL", os.getenv("USER"))
-            source_dirs = [Path(mount_point)]
+        if success:
+            print("\nКопирование завершено успешно!")
+            sys.exit(0)
         else:
-            source_dirs = [Path(src) for src in args.source]
-
-        # Запускаем приложение
-        output_dir = Path(args.output).expanduser()
-        success = app.run(args.session, source_dirs, output_dir)
-
-        sys.exit(0 if success else 1)
+            print("\nКопирование завершено с ошибками.")
+            sys.exit(1)
 
     except Exception as e:
-        logger.error(f"Критическая ошибка: {e}", exc_info=args.verbose)
+        print(f"Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
