@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="copy-photo",
-    version="1.2.1",
+    version="1.2.2",
     author="Evgeny Vekovshinin",
     author_email="evgeny@vekovshinin.ru",
     description="Professional photo copying and organization tool with EXIF support",
